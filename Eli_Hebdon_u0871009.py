@@ -28,25 +28,25 @@ class ClientThread(threading.Thread):
             http_request = self.csocket.recv(2048).decode()
             response, is_valid = is_valid_request(http_request)
             if not is_valid:
-                self.csocket.send(response)
-                print('Closed connection with client ' + str(self.addr))
-                self.csocket.close()
+                self.csocket.send(response.encode())
             else:
                 # format and forward request to remote server
                 server_response = forward_request(format_request(http_request))
                 print('Sending server response back to client: ' + str(self.addr))
-                bytes = io.BytesIO(server_response)
+                bytes = io.BytesIO(server_response.encode())
                 while True:
                     chunk = bytes.read(10000)
                     if not chunk:
                         break
                     self.csocket.send(chunk)
-                print('Closed connection with client: ' + str(self.addr))
-                self.csocket.close()
+            # complete transaction with client and close connection
+            print('Closed connection with client ' + str(self.addr))
+            self.csocket.close()
         except:
             print('Closed connection with client: ' + str(self.addr))
             self.csocket.close()
             return
+
 
 
 
@@ -56,7 +56,6 @@ def is_valid_request(http_request):
     :param http_request:
     :return: tuple containing http response if invalid and bool indicating whether or not request was valid
     """
-    print(str(http_request))
     http_response = 'HTTP/1.0'
     try:
         parsed_url = urlparse(http_request.split(' ')[1])
@@ -98,6 +97,7 @@ def format_request(http_request):
     else:
         host = headers['Host']
     for key, value in headers.items():
+        # ignore connection headers
         if key.find('Connection') == -1:
             formatted_request += key + ': ' + value + '\r\n'
     formatted_request += 'Connection: close\r\n\r\n'
