@@ -33,7 +33,7 @@ class ClientThread(threading.Thread):
                 # format and forward request to remote server
                 server_response = forward_request(format_request(http_request))
                 print('Sending server response back to client: ' + str(self.addr))
-                bytes = io.BytesIO(server_response.encode())
+                bytes = io.BytesIO(server_response)
                 while True:
                     chunk = bytes.read(10000)
                     if not chunk:
@@ -42,7 +42,7 @@ class ClientThread(threading.Thread):
             # complete transaction with client and close connection
             print('Closed connection with client ' + str(self.addr))
             self.csocket.close()
-        except:
+        except NameError:
             print('Closed connection with client: ' + str(self.addr))
             self.csocket.close()
             return
