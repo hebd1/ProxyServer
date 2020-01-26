@@ -1,10 +1,16 @@
 # Eli Hebdon u0871009
+from StringIO import StringIO
+from httplib import HTTPResponse
 from socket import *
 import email
 from urlparse import urlparse
 import argparse
 import threading
 import io
+import hashlib
+import requests
+import urllib3
+
 
 
 class ClientThread(threading.Thread):
@@ -32,6 +38,9 @@ class ClientThread(threading.Thread):
             else:
                 # format and forward request to remote server
                 server_response = forward_request(format_request(http_request))
+                # filter malware from response
+                if contains_malware(server_response):
+                    server_response = "HTTP/1.0 200 OK\r\n\r\nError: Content Blocked because it contains malware\n"
                 print('Sending server response back to client: ' + str(self.addr))
                 bytes = io.BytesIO(server_response)
                 while True:
@@ -48,7 +57,29 @@ class ClientThread(threading.Thread):
             return
 
 
+class HTTPObject():
+    def __init__(self, response_str):
+        self._file = StringIO(response_str)
+    def makefile(self, *args, **kwargs):
+        return self._file
 
+def filter_malware(response_str):
+    source = HTTPObject(response_str)
+    http_response = HTTPResponse(source)
+    http_response.begin()
+    url = 'https://www.virustotal.com/vtapi/v2/file/report'
+    content = http_response.read(len(response_str))
+    hash = hashlib.md5(content).hexdigest()
+    params = {'apikey': apikey, 'resource': hash}
+    response = requests.get(url, params=params)
+    return response
+
+def contains_malware(response_str):
+    virus_total_response = filter_malware(response_str)
+    if "true" in virus_total_response.text:
+        return True
+    else:
+        return False
 
 def is_valid_request(http_request):
     """
@@ -120,7 +151,7 @@ def forward_request(http_request):
         client_socket.connect((host, port))
     except:
         # could not connect to remote server
-        server_response = "Failed to connect to " + host + " port " + str(port) + ": Connection refused\r\n"
+        server_response = "HTTP/1.0 400 Bad Request\r\n\r\nFailed to connect to " + host + " port " + str(port) + ": Connection refused\r\n"
         return server_response
     client_socket.send(http_request[0].encode())
     # receive and forward until carriage return / line ends / end of response
@@ -137,13 +168,13 @@ def forward_request(http_request):
     return server_response
 
 
-def begin_listening(server_port):
+def begin_listening():
     """
     Create a new TCP proxy server and begin listening on the user specified port
     When a connection is established, the request is parsed and then forwarded to remote server
     """
     server_socket = socket(AF_INET, SOCK_STREAM)
-    server_address = ('localhost', server_port)
+    server_address = ('localhost', proxy_port)
     server_socket.bind(server_address)
     print('Listening for incoming connections...')
     while True:
@@ -155,14 +186,22 @@ def begin_listening(server_port):
         new_thread.start()
 
 
+
 def main():
     # setup command line arguments
+    urllib3.disable_warnings()
+    global proxy_port
+    global apikey
     parser = argparse.ArgumentParser(
         description='Basic web proxy server that forwards client requests to the remote origin server and filters results through virus scanning software.\n')
     parser.add_argument("--port", default=1440, type=int,
                         help="the port number on which the proxy will listen for incoming connections. The default port is 1440")
+    parser.add_argument("--key", default="0b4062da626725e5bb400ea46d73d639954348ed774fb45770f8eafe415e8704", type=str,
+                        help="the api key with which virustotal scans client requests for malware.")
     args = parser.parse_args()
-    begin_listening(args.port)
+    proxy_port = args.port
+    apikey = args.key
+    begin_listening()
 
 
 if __name__ == '__main__':
