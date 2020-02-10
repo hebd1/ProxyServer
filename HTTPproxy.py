@@ -160,7 +160,6 @@ def forward_request(http_request):
         return server_response
     client_socket.send(http_request[0].encode())
     # receive and forward until carriage return / line ends / end of response
-    bytes = []
     print('Downloading requested item from host: ' + host)
     server_response = recvall(client_socket)
     print('item downloaded: ' + host)
@@ -170,6 +169,7 @@ def forward_request(http_request):
 
 
 def recvall(socket):
+    bytes = []
     while True:
         piece = socket.recv(10000)
         if not piece:
