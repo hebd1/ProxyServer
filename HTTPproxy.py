@@ -34,8 +34,7 @@ class ClientThread(threading.Thread):
         If the request is invalid, a proper error response is sent to the client.
         """
         try:
-            http_request = self.csocket.recv(2048).decode()
-            #http_request = recvall(self.csocket, 8)
+            http_request = self.csocket.recv(2048)
             response, is_valid = is_valid_request(http_request)
             if not is_valid:
                 self.csocket.send(response.encode())
@@ -55,7 +54,7 @@ class ClientThread(threading.Thread):
             # complete transaction with client and close connection
             print('Closed connection with client ' + str(self.addr))
             self.csocket.close()
-        except NameError:
+        except:
             print('Closed connection with client: ' + str(self.addr))
             self.csocket.close()
             return
@@ -94,25 +93,26 @@ def is_valid_request(http_request):
     """
     http_response = 'HTTP/1.0'
     try:
-        parsed_url = urlparse(http_request.split(' ')[1])
+        request_line, headers_raw = http_request.split('\r\n', 1)
+        headers = dict(email.message_from_string(headers_raw))
+        parsed_url = urlparse(request_line.split(' ')[1])
         all([parsed_url.scheme, parsed_url.netloc])
-        # verify GET request
-        if http_request.find('HTTP/1.0') == -1:
-            http_response += ' 400 Bad Request\r\n'
+        if request_line.split(' ')[2] != 'HTTP/1.0':
+            http_response += ' 400 Bad Request\r\n\r\n'
             return http_response, False
-        elif parsed_url.scheme == 'https':
-            http_response += ' 400 Bad Request\r\n'
+        if parsed_url.scheme == 'https':
+            http_response += ' 400 Bad Request\r\n\r\n'
             return http_response, False
-        elif http_request.split(' ')[0] != 'GET':
-            http_response += ' 501 Not Implemented\r\n'
+        elif request_line.split(' ')[0] != 'GET':
+            http_response += ' 501 Not Implemented\r\n\r\n'
             return http_response, False
         elif parsed_url.hostname is None:
-            http_response += ' 400 Bad Request\r\n'
+            http_response += ' 400 Bad Request\r\n\r\n'
             return http_response, False
         else:
             return http_response, True
-    except ValueError:
-        http_response += ' 400 Bad Request\r\n'
+    except:
+        http_response += ' 400 Bad Request\r\n\r\n'
         return http_response, False
 
 
@@ -189,7 +189,7 @@ def begin_listening():
     server_socket.bind(server_address)
     print('Listening for incoming connections...')
     while True:
-        server_socket.listen(5)
+        server_socket.listen(100)
         client_socket, address = server_socket.accept()
         print('New client connected: ' + str(address))
         # create a new thread to serve client
