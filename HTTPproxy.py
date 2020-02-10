@@ -34,7 +34,8 @@ class ClientThread(threading.Thread):
         If the request is invalid, a proper error response is sent to the client.
         """
         try:
-            http_request = self.csocket.recv(2048).decode()
+            #http_request = self.csocket.recv(2048).decode()
+            http_request = recvall(self.csocket)
             response, is_valid = is_valid_request(http_request)
             if not is_valid:
                 self.csocket.send(response.encode())
@@ -161,15 +162,20 @@ def forward_request(http_request):
     # receive and forward until carriage return / line ends / end of response
     bytes = []
     print('Downloading requested item from host: ' + host)
-    while True:
-        piece = client_socket.recv(10000)
-        if not piece:
-            break
-        bytes.append(piece)
-    server_response = ''.join(bytes)
+    server_response = recvall(client_socket)
     print('item downloaded: ' + host)
     client_socket.close()
     return server_response
+
+
+
+def recvall(socket):
+    while True:
+        piece = socket.recv(10000)
+        if not piece:
+            break
+        bytes.append(piece)
+    return ''.join(bytes)
 
 
 def begin_listening():
