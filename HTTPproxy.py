@@ -10,8 +10,6 @@ import io
 import hashlib
 import requests
 import urllib3
-import sys
-print(sys.executable)
 
 #global variables
 proxy_port = 2100
